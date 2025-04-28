@@ -1,0 +1,1 @@
+DOMAIN = "reolink-thumbs"

@@ -1,16 +1,12 @@
 {
-    "domain": "reolink-thumbs",
-    "name": "Reolink thumbnails",
-    "codeowners": [],
-    "config_flow": true,
-    "dependencies": [
-        "reolink"
-    ],
-    "documentation": "https://www.home-assistant.io/integrations/reolink-thumbs",
-    "iot_class": "local_polling",
-    "loggers": [],
-    "requirements": [
-        "ffmpeg-python"
-    ],
-    "version": "0.0.1"
+  "domain": "reolink-thumbs",
+  "name": "Reolink thumbnails",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["reolink"],
+  "documentation": "https://www.home-assistant.io/integrations/reolink-thumbs",
+  "iot_class": "local_polling",
+  "loggers": [],
+  "requirements": ["ffmpeg-python"],
+  "version": "0.0.1"
 }

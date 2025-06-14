@@ -9,12 +9,13 @@ from pathlib import Path
 
 import ffmpeg
 from reolink_aio.enums import VodRequestType
-
+from reolink_aio.typings import VOD_trigger
 from homeassistant.components.media_player import MediaClass, MediaType
 from homeassistant.components.media_source import BrowseMediaSource
 from homeassistant.components.reolink.const import DOMAIN as REOLINK_DOMAIN
 from homeassistant.components.reolink.media_source import (
     DUAL_LENS_MODELS,
+    VOD_SPLIT_TIME,
     ReolinkVODMediaSource,
     res_name,
 )
@@ -60,6 +61,7 @@ async def _async_generate_camera_files(
     year: int,
     month: int,
     day: int,
+    event: str | None = None,
 ) -> BrowseMediaSource:
     """Return all recording files on a specific day of a Reolink camera."""
     host = get_host(self.hass, config_entry_id)
@@ -77,7 +79,34 @@ async def _async_generate_camera_files(
             month,
             day,
         )
-    _, vod_files = await host.api.request_vod_files(channel, start, end, stream=stream)
+    event_trigger = VOD_trigger[event] if event is not None else None
+    _, vod_files = await host.api.request_vod_files(
+        channel,
+        start,
+        end,
+        stream=stream,
+        split_time=VOD_SPLIT_TIME,
+        trigger=event_trigger
+    )
+
+    if event is None and host.api.is_nvr and not host.api.is_hub:
+        triggers = VOD_trigger.NONE
+        for file in vod_files:
+            triggers |= file.triggers
+
+        children.extend(
+            BrowseMediaSource(
+                domain=REOLINK_DOMAIN,
+                identifier=f"EVE|{config_entry_id}|{channel}|{stream}|{year}|{month}|{day}|{trigger.name}",
+                media_class=MediaClass.DIRECTORY,
+                media_content_type=MediaType.PLAYLIST,
+                title=str(trigger.name).title(),
+                can_play=False,
+                can_expand=True,
+            )
+            for trigger in triggers
+        )
+
     for file in vod_files:
         file_name = f"{file.start_time.time()} {file.duration}"
         if file.triggers != file.triggers.NONE:
@@ -87,6 +116,7 @@ async def _async_generate_camera_files(
                 if trigger != trigger.NONE
             )
 
+        # Add custom to display thumbs
         video_path = Path(file.file_name)
         new_directory = Path(f"{www_path}/recordings/{video_path.parent}")
         if not Path.exists(new_directory):
@@ -101,11 +131,12 @@ async def _async_generate_camera_files(
             await asyncio.create_task(
                 asyncio.to_thread(generate_thumbnail, reolink_url, thumb_path)
             )
+        # ===== End custom =====
 
         children.append(
             BrowseMediaSource(
                 domain=REOLINK_DOMAIN,
-                identifier=f"FILE|{config_entry_id}|{channel}|{stream}|{file.file_name}",
+                identifier=f"FILE|{config_entry_id}|{channel}|{stream}|{file.file_name}|{file.start_time_id}|{file.end_time_id}",
                 media_class=MediaClass.VIDEO,
                 media_content_type=MediaType.VIDEO,
                 title=file_name,
@@ -115,9 +146,13 @@ async def _async_generate_camera_files(
             )
         )
 
-    title = f"{host.api.camera_name(channel)} {res_name(stream)} {year}/{month}/{day}"
+    title = (
+        f"{host.api.camera_name(channel)} {res_name(stream)} {year}/{month}/{day}"
+    )
     if host.api.model in DUAL_LENS_MODELS:
         title = f"{host.api.camera_name(channel)} lens {channel} {res_name(stream)} {year}/{month}/{day}"
+    if event:
+        title = f"{title} {event.title()}"
 
     return BrowseMediaSource(
         domain=REOLINK_DOMAIN,

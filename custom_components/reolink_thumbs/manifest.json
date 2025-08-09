@@ -5,9 +5,9 @@
   "config_flow": true,
   "dependencies": ["reolink"],
   "documentation": "https://github.com/cyr-ius/hass-reolink-thumbs",
+  "integration_type": "service",
   "issue_tracker": "https://github.com/cyr-ius/hass-reolink-thumbs/issues",
-  "iot_class": "local_polling",
-  "loggers": [],
   "requirements": ["ffmpeg-python"],
-  "version": "0.2.0"
+  "single_config_entry": true,
+  "version": "0.2.5"
 }

@@ -1,5 +1,5 @@
 {
-  "domain": "reolink-thumbs",
+  "domain": "reolink_thumbs",
   "name": "Reolink thumbs",
   "codeowners": ["@cyr-ius"],
   "config_flow": true,
@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "loggers": [],
   "requirements": ["ffmpeg-python"],
-  "version": "0.0.2"
+  "version": "0.1.0"
 }

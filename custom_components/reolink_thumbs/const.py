@@ -1,1 +1,1 @@
-DOMAIN = "reolink-thumbs"
+DOMAIN = "reolink_thumbs"

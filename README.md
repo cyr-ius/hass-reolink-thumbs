@@ -4,6 +4,9 @@ This a _custom component_ for [Home Assistant](https://www.home-assistant.io/).
 
 With Reolink-thumbs, this allows you to display thumbnails in the media sources section.
 
+<img width="200" height="400" alt="image" src="https://github.com/user-attachments/assets/16134546-c388-47d4-adc7-46b26ae02a5b" />
+
+
 Images are generated on the fly during a day's viewing. They are stored in the /config/www/recordings directory.
 
 ![GitHub release](https://img.shields.io/github/release/Cyr-ius/hass-reolink-thumbs)

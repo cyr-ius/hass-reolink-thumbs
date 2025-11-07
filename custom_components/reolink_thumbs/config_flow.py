@@ -7,7 +7,7 @@ from homeassistant import config_entries
 from .const import DOMAIN
 
 
-class HeatzyFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+class ReolinkThumbsFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
     VERSION = 1

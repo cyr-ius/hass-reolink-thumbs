@@ -38,19 +38,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 def get_vod_type(host, filename) -> VodRequestType:
     """VOD Type."""
-    if filename.endswith(".mp4"):
-        if host.api.is_nvr:
-            return VodRequestType.DOWNLOAD
-        return VodRequestType.PLAYBACK
+    # For thumbnail generation, always prefer DOWNLOAD/PLAYBACK over streaming formats
+    # FLV and RTMP streams don't work well with FFmpeg for single frame extraction
     if host.api.is_nvr:
-        return VodRequestType.FLV
-    return VodRequestType.RTMP
+        return VodRequestType.DOWNLOAD
+    return VodRequestType.PLAYBACK
 
 
 def generate_thumbnail(link, path):
     """Generate thumb file."""
-    _LOGGER.debug("% - %s ", link, path)
-    ffmpeg.input(link, ss=0).filter("scale", 256, -1).output(str(path), vframes=1).run()
+    try:
+        _LOGGER.info("Starting FFmpeg for thumbnail - URL: %s, Output: %s", link, path)
+        
+        # Run FFmpeg and capture output for better error messages
+        ffmpeg.input(link, ss=0).filter("scale", 256, -1).output(
+            str(path), vframes=1, loglevel='error'
+        ).run(capture_stdout=True, capture_stderr=True)
+        
+        _LOGGER.info("Thumbnail successfully created: %s", path)
+        
+    except ffmpeg.Error as e:
+        _LOGGER.error(
+            "FFmpeg error creating thumbnail for %s: stdout=%s, stderr=%s",
+            link,
+            e.stdout.decode('utf8') if e.stdout else 'N/A',
+            e.stderr.decode('utf8') if e.stderr else 'N/A'
+        )
+        # Don't raise - allow media browser to continue without thumbnail
+    except Exception as e:
+        _LOGGER.error("Unexpected error creating thumbnail for %s: %s", link, str(e), exc_info=True)
+        # Don't raise - allow media browser to continue without thumbnail
 
 
 async def _async_generate_camera_files(

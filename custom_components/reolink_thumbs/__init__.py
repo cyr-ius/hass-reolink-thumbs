@@ -116,6 +116,7 @@ async def _generate_missing_thumbnails(
     Args:
         hass: Home Assistant instance
         days: Number of days to look back (default 1 = today only)
+        entry_id: Identifier
     """
     # Get Reolink config entries
     if entry_id:
@@ -125,9 +126,7 @@ async def _generate_missing_thumbnails(
             if entry.entry_id == entry_id
         ]
     else:
-        reolink_entries = [
-            entry for entry in hass.config_entries.async_entries(REOLINK_DOMAIN)
-        ]
+        reolink_entries = hass.config_entries.async_entries(REOLINK_DOMAIN)
 
     if not reolink_entries:
         _LOGGER.debug("No Reolink entries found for background thumbnail generation")

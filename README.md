@@ -10,6 +10,8 @@ Images are generated on the fly during a day's viewing. They are stored in the `
 
 ![GitHub release](https://img.shields.io/github/release/Cyr-ius/hass-reolink-thumbs)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
+![downloads](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.reolink-thumbs.total)
+
 
 ## Installation
 

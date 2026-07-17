@@ -6,6 +6,7 @@ import asyncio
 import datetime as dt
 import logging
 from pathlib import Path
+import re
 
 import ffmpeg
 from reolink_aio.enums import VodRequestType
@@ -67,6 +68,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.info("Registered service: %s.%s", DOMAIN, SERVICE_GENERATE_THUMBNAILS)
 
     return True
+
+
+def get_normalized_thumb_path(www_path: str, file_name: str) -> Path:
+    """Get a normalized thumbnail path that is identical for both main and sub streams."""
+    video_path = Path(file_name)
+    stem = video_path.stem
+
+    # Match standard NVR/SD card convention:
+    # Rec[MS]<channel>_<prefix><date>_<start_time>_<end_time>_<hex>
+    # e.g., RecS02_DST20260711_004228_004257_3914880_BCECD
+    # We extract: channel, prefix, date, and end_time (ignoring start_time and hex)
+    match = re.match(
+        r"^Rec[MS]([0-9A-Za-z]+)_([A-Za-z]*)(\d{8})_\d{6}_(\d{6})", stem
+    )
+    if match:
+        channel, prefix, date, end_time = match.groups()
+        normalized_stem = f"Rec{channel}_{prefix}{date}_{end_time}"
+    else:
+        # General fallback: remove "S" or "M" distinction if it starts with "Rec[MS]"
+        normalized_stem = re.sub(r"^Rec[MS]", "Rec", stem)
+
+    new_directory = Path(f"{www_path}/recordings/{video_path.parent}")
+    return Path(f"{new_directory}/{normalized_stem}.png")
 
 
 def get_vod_type(host, filename) -> VodRequestType:
@@ -153,8 +177,8 @@ async def _generate_missing_thumbnails(
             channels = list(host.api.channels)
 
             for channel in channels:
-                # Use main stream for thumbnails
-                stream = "main"
+                # Use low resolution (sub) stream for thumbnails to save bandwidth and CPU
+                stream = "sub"
 
                 # Process each day in the range
                 for day_offset in range(days):
@@ -197,16 +221,12 @@ async def _generate_missing_thumbnails(
 
                         # Process each file
                         for file in vod_files:
-                            video_path = Path(file.file_name)
-                            new_directory = Path(
-                                f"{www_path}/recordings/{video_path.parent}"
-                            )
+                            thumb_path = get_normalized_thumb_path(www_path, file.file_name)
+                            new_directory = thumb_path.parent
 
                             # Ensure directory exists
                             if not Path.exists(new_directory):
                                 new_directory.mkdir(parents=True, exist_ok=True)
-
-                            thumb_path = Path(f"{new_directory}/{video_path.stem}.png")
 
                             # Only generate if missing
                             if not Path.exists(thumb_path):
@@ -328,19 +348,19 @@ async def _async_generate_camera_files(
 
         # Add custom to display thumbs
         video_path = Path(file.file_name)
-        new_directory = Path(f"{www_path}/recordings/{video_path.parent}")
+        thumb_path = get_normalized_thumb_path(www_path, file.file_name)
+        new_directory = thumb_path.parent
         if not Path.exists(new_directory):
             new_directory.mkdir(parents=True, exist_ok=True)
-
-        thumb_path = Path(f"{new_directory}/{video_path.stem}.png")
 
         # Try to generate thumbnail if it doesn't exist yet
         if not Path.exists(thumb_path):
             try:
                 _LOGGER.info("Preparing thumbnail for %s", file.file_name)
                 vod_type = get_vod_type(host, file.file_name)
+                # Always generate thumbnails using the low resolution (sub) stream to save bandwidth and CPU
                 _, reolink_url = await host.api.get_vod_source(
-                    channel, file.file_name, stream, vod_type
+                    channel, file.file_name, "sub", vod_type
                 )
                 _LOGGER.info("Got VOD URL for %s: %s", file.file_name, reolink_url)
 
@@ -363,7 +383,7 @@ async def _async_generate_camera_files(
         thumbnail_url = None
         if Path.exists(thumb_path):
             thumbnail_url = (
-                f"/local/recordings/{video_path.parent}/{video_path.stem}.png"
+                f"/local/recordings/{video_path.parent}/{thumb_path.name}"
             )
 
         children.append(

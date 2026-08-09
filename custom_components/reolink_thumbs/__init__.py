@@ -15,7 +15,6 @@ from homeassistant.components.media_player import MediaClass, MediaType
 from homeassistant.components.media_source import BrowseMediaSource
 from homeassistant.components.reolink.const import DOMAIN as REOLINK_DOMAIN
 from homeassistant.components.reolink.media_source import (
-    DUAL_LENS_MODELS,
     VOD_SPLIT_TIME,
     ReolinkVODMediaSource,
     res_name,
@@ -380,7 +379,7 @@ async def _async_generate_camera_files(
         )
 
     title = f"{host.api.camera_name(channel)} {res_name(stream)} {year}/{month}/{day}"
-    if host.api.model in DUAL_LENS_MODELS:
+    if host.api.is_dual_lens:
         title = f"{host.api.camera_name(channel)} lens {channel} {res_name(stream)} {year}/{month}/{day}"
     if event:
         title = f"{title} {event.title()}"

@@ -12,7 +12,6 @@ Images are generated on the fly during a day's viewing. They are stored in the `
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 ![downloads](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.reolink-thumbs.total)
 
-
 ## Installation
 
 Add Reolink-thumbs module via HACS
@@ -30,6 +29,7 @@ Add your equipment via the Integration menu
 Generate thumbnails for Reolink camera recordings. This service can be called manually or triggered via automations.
 
 **Parameters:**
+
 - `days` (optional, default: 1): Number of days to look back (1-365)
 
 **Examples:**
@@ -52,6 +52,7 @@ data:
 ### Automation Examples
 
 **Generate thumbnails every 30 minutes:**
+
 ```yaml
 alias: "Reolink: Auto-Generate Thumbnails"
 trigger:
@@ -65,6 +66,7 @@ mode: single
 ```
 
 **Generate thumbnails after motion detection:**
+
 ```yaml
 alias: "Reolink: Thumbnails after Motion"
 trigger:
@@ -73,7 +75,7 @@ trigger:
     to: "on"
 action:
   - delay:
-      minutes: 2  # Wait for recording to be saved
+      minutes: 2 # Wait for recording to be saved
   - service: reolink_thumbs.generate_thumbnails
     data:
       days: 1
@@ -94,6 +96,7 @@ logger:
 ```
 
 After adding this configuration, restart Home Assistant. Debug logs will help identify issues with:
+
 - Thumbnail generation failures
 - Camera connection problems
 - Service call issues
@@ -102,16 +105,19 @@ After adding this configuration, restart Home Assistant. Debug logs will help id
 ### Common Issues
 
 **Thumbnails not generating:**
+
 - Check that cameras have recordings on the SD card
 - Verify FFmpeg is installed (required for thumbnail generation)
 - Check logs for error messages with debug logging enabled
 
 **Service not appearing:**
+
 - Restart Home Assistant after installation
 - Check that the integration is properly installed via HACS
 - Verify `services.yaml` exists in the component directory
 
 **Cameras showing as offline:**
+
 - These will be logged as DEBUG messages (not errors)
 - Ensure cameras are powered on and connected to the network
 - Check Reolink integration is working correctly

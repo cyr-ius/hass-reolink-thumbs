@@ -5,13 +5,10 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
-from pathlib import Path
 import re
+from pathlib import Path
 
 import ffmpeg
-from reolink_aio.enums import VodRequestType
-from reolink_aio.typings import VOD_trigger
-
 from homeassistant.components.media_player import MediaClass, MediaType
 from homeassistant.components.media_source import BrowseMediaSource
 from homeassistant.components.reolink.const import DOMAIN as REOLINK_DOMAIN
@@ -23,6 +20,8 @@ from homeassistant.components.reolink.media_source import (
 from homeassistant.components.reolink.util import get_host
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from reolink_aio.enums import VodRequestType
+from reolink_aio.typings import VOD_trigger
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def get_normalized_thumb_path(www_path: str, file_name: str) -> Path:
-    """Get a normalized thumbnail path that is identical for both main and sub streams."""
+    """Get a thumbnail path that is identical for both main and sub streams."""
     video_path = Path(file_name)
     stem = video_path.stem
 
@@ -78,9 +77,7 @@ def get_normalized_thumb_path(www_path: str, file_name: str) -> Path:
     # Rec[MS]<channel>_<prefix><date>_<start_time>_<end_time>_<hex>
     # e.g., RecS02_DST20260711_004228_004257_3914880_BCECD
     # We extract: channel, prefix, date, and end_time (ignoring start_time and hex)
-    match = re.match(
-        r"^Rec[MS]([0-9A-Za-z]+)_([A-Za-z]*)(\d{8})_\d{6}_(\d{6})", stem
-    )
+    match = re.match(r"^Rec[MS]([0-9A-Za-z]+)_([A-Za-z]*)(\d{8})_\d{6}_(\d{6})", stem)
     if match:
         channel, prefix, date, end_time = match.groups()
         normalized_stem = f"Rec{channel}_{prefix}{date}_{end_time}"
@@ -176,7 +173,7 @@ async def _generate_missing_thumbnails(
             channels = list(host.api.channels)
 
             for channel in channels:
-                # Use low resolution (sub) stream for thumbnails to save bandwidth and CPU
+                # Use the low resolution (sub) stream to save bandwidth and CPU
                 stream = "sub"
 
                 # Process each day in the range
@@ -220,7 +217,9 @@ async def _generate_missing_thumbnails(
 
                         # Process each file
                         for file in vod_files:
-                            thumb_path = get_normalized_thumb_path(www_path, file.file_name)
+                            thumb_path = get_normalized_thumb_path(
+                                www_path, file.file_name
+                            )
                             new_directory = thumb_path.parent
 
                             # Ensure directory exists
@@ -254,7 +253,8 @@ async def _generate_missing_thumbnails(
                         error_str = str(e)
                         if "'rspCode': -17" in error_str or "rcv failed" in error_str:
                             _LOGGER.debug(
-                                "No recordings found for camera %s channel %s on %s (no SD card or no recordings)",
+                                "No recordings found for camera %s channel %s on %s"
+                                " (no SD card or no recordings)",
                                 host.api.camera_name(channel),
                                 channel,
                                 check_date.strftime("%Y-%m-%d"),
@@ -272,7 +272,8 @@ async def _generate_missing_thumbnails(
             error_str = str(e)
             if "runtime_data" in error_str or "has no attribute" in error_str:
                 _LOGGER.debug(
-                    "Reolink device %s (%s) not ready or offline, skipping thumbnail generation",
+                    "Reolink device %s (%s) not ready or offline,"
+                    " skipping thumbnail generation",
                     reolink_entry.title,
                     getattr(reolink_entry, "unique_id", "unknown"),
                 )
@@ -357,14 +358,14 @@ async def _async_generate_camera_files(
             try:
                 _LOGGER.info("Preparing thumbnail for %s", file.file_name)
                 vod_type = get_vod_type(host, file.file_name)
-                # Always generate thumbnails using the low resolution (sub) stream to save bandwidth and CPU
+                # Always use the low resolution (sub) stream to save bandwidth and CPU
                 _, reolink_url = await host.api.get_vod_source(
                     channel, file.file_name, "sub", vod_type
                 )
                 _LOGGER.info("Got VOD URL for %s: %s", file.file_name, reolink_url)
 
                 # Generate thumbnail synchronously so we can see it immediately
-                # This blocks the media browser slightly but ensures thumbnails are created
+                # This blocks the media browser slightly but ensures thumbnails exist
                 await asyncio.to_thread(generate_thumbnail, reolink_url, thumb_path)
 
             except Exception as e:
@@ -381,9 +382,7 @@ async def _async_generate_camera_files(
         # Only set thumbnail if file exists, otherwise None
         thumbnail_url = None
         if Path.exists(thumb_path):
-            thumbnail_url = (
-                f"/local/recordings/{video_path.parent}/{thumb_path.name}"
-            )
+            thumbnail_url = f"/local/recordings/{video_path.parent}/{thumb_path.name}"
 
         children.append(
             BrowseMediaSource(
@@ -400,7 +399,10 @@ async def _async_generate_camera_files(
 
     title = f"{host.api.camera_name(channel)} {res_name(stream)} {year}/{month}/{day}"
     if host.api.is_dual_lens:
-        title = f"{host.api.camera_name(channel)} lens {channel} {res_name(stream)} {year}/{month}/{day}"
+        title = (
+            f"{host.api.camera_name(channel)} lens {channel} "
+            f"{res_name(stream)} {year}/{month}/{day}"
+        )
     if event:
         title = f"{title} {event.title()}"
 

@@ -41,3 +41,4 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 [tool.codespell]
 skip = "./.*,*.csv,*.json,uv.lock"
 quiet-level = 2
+ignore-words-list = "hass"

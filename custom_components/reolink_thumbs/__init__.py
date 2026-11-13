@@ -5,10 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
-import re
-from pathlib import Path
 
-import ffmpeg
 from homeassistant.components.media_player import MediaClass, MediaType
 from homeassistant.components.media_source import BrowseMediaSource
 from homeassistant.components.reolink.const import DOMAIN as REOLINK_DOMAIN
@@ -20,28 +17,16 @@ from homeassistant.components.reolink.media_source import (
 from homeassistant.components.reolink.util import get_host
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.util import dt as dt_util
-from reolink_aio.enums import VodRequestType
-from reolink_aio.typings import VOD_file, VOD_trigger
+from homeassistant.util.hass_dict import HassKey
+from reolink_aio.typings import VOD_trigger
 
-from .const import (
-    CONF_SNAPSHOT_DIRECTORY,
-    CONF_SNAPSHOT_PATTERN,
-    CONF_SNAPSHOT_TOLERANCE,
-    DEFAULT_SNAPSHOT_PATTERN,
-    DEFAULT_SNAPSHOT_TOLERANCE,
-)
-from .snapshot import (
-    compile_name_pattern,
-    find_snapshot,
-    recording_window,
-    snapshot_directories,
-)
+from .const import DOMAIN
+from .thumbnail import ThumbnailGenerator
+from .view import ThumbnailView
 
 _LOGGER = logging.getLogger(__name__)
 
-# Domain for this component
-DOMAIN = "reolink_thumbs"
+DATA_GENERATOR: HassKey[ThumbnailGenerator] = HassKey(DOMAIN)
 
 # Service name
 SERVICE_GENERATE_THUMBNAILS = "generate_thumbnails"
@@ -49,6 +34,10 @@ SERVICE_GENERATE_THUMBNAILS = "generate_thumbnails"
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set the config entry up."""
+
+    if DATA_GENERATOR not in hass.data:
+        generator = hass.data[DATA_GENERATOR] = ThumbnailGenerator(hass)
+        hass.http.register_view(ThumbnailView(generator))
 
     ReolinkVODMediaSource._async_generate_camera_files = (  # type:ignore[private-member-access]
         _async_generate_camera_files
@@ -83,133 +72,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def get_normalized_thumb_path(www_path: str, file_name: str) -> Path:
-    """Get a thumbnail path that is identical for both main and sub streams."""
-    video_path = Path(file_name)
-    stem = video_path.stem
-
-    # Match standard NVR/SD card convention:
-    # Rec[MS]<channel>_<prefix><date>_<start_time>_<end_time>_<hex>
-    # e.g., RecS02_DST20260711_004228_004257_3914880_BCECD
-    # We extract: channel, prefix, date, and end_time (ignoring start_time and hex)
-    match = re.match(r"^Rec[MS]([0-9A-Za-z]+)_([A-Za-z]*)(\d{8})_\d{6}_(\d{6})", stem)
-    if match:
-        channel, prefix, date, end_time = match.groups()
-        normalized_stem = f"Rec{channel}_{prefix}{date}_{end_time}"
-    else:
-        # General fallback: remove "S" or "M" distinction if it starts with "Rec[MS]"
-        normalized_stem = re.sub(r"^Rec[MS]", "Rec", stem)
-
-    new_directory = Path(f"{www_path}/recordings/{video_path.parent}")
-    return Path(f"{new_directory}/{normalized_stem}.png")
-
-
-def get_vod_type(host, filename) -> VodRequestType:
-    """VOD Type."""
-    # For thumbnail generation, always prefer DOWNLOAD/PLAYBACK over streaming formats
-    # FLV and RTMP streams don't work well with FFmpeg for single frame extraction
-    if host.api.is_nvr:
-        return VodRequestType.DOWNLOAD
-    return VodRequestType.PLAYBACK
-
-
-def generate_thumbnail(link, path, image=False):
-    """Generate thumb file from a recording or, if image is True, a still image."""
-    try:
-        _LOGGER.info("Starting FFmpeg for thumbnail - URL: %s, Output: %s", link, path)
-
-        # Seeking a single image makes FFmpeg write no output at all
-        input_options = {} if image else {"ss": 0}
-
-        # Run FFmpeg and capture output for better error messages
-        ffmpeg.input(link, **input_options).filter("scale", 256, -1).output(
-            str(path), vframes=1, loglevel="error"
-        ).run(capture_stdout=True, capture_stderr=True)
-
-        if Path(path).exists():
-            _LOGGER.info("Thumbnail successfully created: %s", path)
-        else:
-            _LOGGER.warning("FFmpeg did not create thumbnail %s from %s", path, link)
-
-    except ffmpeg.Error as e:
-        _LOGGER.error(
-            "FFmpeg error creating thumbnail for %s: stdout=%s, stderr=%s",
-            link,
-            e.stdout.decode("utf8") if e.stdout else "N/A",
-            e.stderr.decode("utf8") if e.stderr else "N/A",
-        )
-        # Don't raise - allow media browser to continue without thumbnail
-    except Exception as e:
-        _LOGGER.error(
-            "Unexpected error creating thumbnail for %s: %s",
-            link,
-            str(e),
-            exc_info=True,
-        )
-        # Don't raise - allow media browser to continue without thumbnail
-
-
-async def _async_find_external_snapshot(
-    hass: HomeAssistant, host, channel: int, file: VOD_file
-) -> Path | None:
-    """Return an external snapshot taken during the recording, if configured."""
-    entries = hass.config_entries.async_entries(DOMAIN)
-    if not entries:
-        return None
-    options = entries[0].options
-    template = options.get(CONF_SNAPSHOT_DIRECTORY)
-    if not template:
-        return None
-
-    tz = dt_util.get_default_time_zone()
-    tolerance = dt.timedelta(
-        seconds=options.get(CONF_SNAPSHOT_TOLERANCE, DEFAULT_SNAPSHOT_TOLERANCE)
-    )
-    start, end = recording_window(file.start_time, file.end_time, tolerance, tz)
-    try:
-        pattern = compile_name_pattern(
-            options.get(CONF_SNAPSHOT_PATTERN, DEFAULT_SNAPSHOT_PATTERN)
-        )
-        directories = snapshot_directories(
-            template, host.api.camera_name(channel), channel, start, end, tz
-        )
-    except ValueError as err:
-        _LOGGER.warning("Invalid external snapshot settings: %s", err)
-        return None
-
-    snapshot = await asyncio.to_thread(
-        find_snapshot, directories, pattern, tz, start, end
-    )
-    if snapshot is None:
-        _LOGGER.debug(
-            "No external snapshot for %s in %s",
-            file.file_name,
-            ", ".join(str(directory) for directory in directories),
-        )
-    else:
-        _LOGGER.debug("Using external snapshot %s for %s", snapshot, file.file_name)
-    return snapshot
-
-
-async def _async_thumbnail_source(
-    hass: HomeAssistant, host, channel: int, file: VOD_file
-) -> tuple[str, bool]:
-    """Return the FFmpeg input for a thumbnail and whether it is a still image.
-
-    The input is an external snapshot if one matches, otherwise the recording.
-    """
-    snapshot = await _async_find_external_snapshot(hass, host, channel, file)
-    if snapshot is not None:
-        return str(snapshot), True
-
-    vod_type = get_vod_type(host, file.file_name)
-    # Always use the low resolution (sub) stream to save bandwidth and CPU
-    _, reolink_url = await host.api.get_vod_source(
-        channel, file.file_name, "sub", vod_type
-    )
-    return reolink_url, False
-
-
 async def _generate_missing_thumbnails(
     hass: HomeAssistant, days: int = 1, entry_id: str | None = None
 ):
@@ -234,7 +96,7 @@ async def _generate_missing_thumbnails(
         _LOGGER.debug("No Reolink entries found for background thumbnail generation")
         return
 
-    www_path = hass.config.path("www")
+    generator = hass.data[DATA_GENERATOR]
     today = dt.datetime.now()
 
     # Calculate date range
@@ -297,37 +159,24 @@ async def _generate_missing_thumbnails(
                             check_date.strftime("%Y-%m-%d"),
                         )
 
-                        # Process each file
-                        for file in vod_files:
-                            thumb_path = get_normalized_thumb_path(
-                                www_path, file.file_name
-                            )
-                            new_directory = thumb_path.parent
-
-                            # Ensure directory exists
-                            if not Path.exists(new_directory):
-                                new_directory.mkdir(parents=True, exist_ok=True)
-
-                            # Only generate if missing
-                            if not Path.exists(thumb_path):
-                                try:
-                                    source, image = await _async_thumbnail_source(
-                                        hass, host, channel, file
-                                    )
-
-                                    _LOGGER.debug(
-                                        "Generating thumbnail for %s", file.file_name
-                                    )
-                                    await asyncio.to_thread(
-                                        generate_thumbnail, source, thumb_path, image
-                                    )
-
-                                except Exception as e:
-                                    _LOGGER.error(
-                                        "Failed to generate thumbnail for %s: %s",
-                                        file.file_name,
-                                        e,
-                                    )
+                        # Missing thumbnails are created in parallel, the
+                        # generator limits the load on each device
+                        results = await asyncio.gather(
+                            *(
+                                generator.async_get(
+                                    reolink_entry.entry_id, channel, file
+                                )
+                                for file in vod_files
+                            ),
+                            return_exceptions=True,
+                        )
+                        for file, result in zip(vod_files, results, strict=True):
+                            if isinstance(result, Exception):
+                                _LOGGER.error(
+                                    "Failed to generate thumbnail for %s: %s",
+                                    file.file_name,
+                                    result,
+                                )
 
                     except Exception as e:
                         # Check if it's a "no recordings" error (API code -17)
@@ -376,7 +225,7 @@ async def _async_generate_camera_files(
 ) -> BrowseMediaSource:
     """Return all recording files on a specific day of a Reolink camera."""
     host = get_host(self.hass, config_entry_id)
-    www_path = self.hass.config.path("www")
+    generator = self.hass.data[DATA_GENERATOR]
 
     start = dt.datetime(year, month, day, hour=0, minute=0, second=0)
     end = dt.datetime(year, month, day, hour=23, minute=59, second=59)
@@ -427,41 +276,9 @@ async def _async_generate_camera_files(
                 if trigger != trigger.NONE
             )
 
-        # Add custom to display thumbs
-        video_path = Path(file.file_name)
-        thumb_path = get_normalized_thumb_path(www_path, file.file_name)
-        new_directory = thumb_path.parent
-        if not Path.exists(new_directory):
-            new_directory.mkdir(parents=True, exist_ok=True)
-
-        # Try to generate thumbnail if it doesn't exist yet
-        if not Path.exists(thumb_path):
-            try:
-                _LOGGER.info("Preparing thumbnail for %s", file.file_name)
-                source, image = await _async_thumbnail_source(
-                    self.hass, host, channel, file
-                )
-                _LOGGER.info("Got thumbnail source for %s: %s", file.file_name, source)
-
-                # Generate thumbnail synchronously so we can see it immediately
-                # This blocks the media browser slightly but ensures thumbnails exist
-                await asyncio.to_thread(generate_thumbnail, source, thumb_path, image)
-
-            except Exception as e:
-                _LOGGER.error(
-                    "Error preparing thumbnail generation for %s: %s",
-                    file.file_name,
-                    e,
-                    exc_info=True,
-                )
-        else:
-            _LOGGER.debug("Thumbnail already exists: %s", thumb_path)
-        # ===== End custom =====
-
-        # Only set thumbnail if file exists, otherwise None
-        thumbnail_url = None
-        if Path.exists(thumb_path):
-            thumbnail_url = f"/local/recordings/{video_path.parent}/{thumb_path.name}"
+        # Thumbnails are created by the view when the frontend requests them,
+        # so the list is returned without waiting for FFmpeg
+        thumbnail = generator.url(config_entry_id, channel, file)
 
         children.append(
             BrowseMediaSource(
@@ -472,7 +289,7 @@ async def _async_generate_camera_files(
                 title=file_name,
                 can_play=True,
                 can_expand=False,
-                thumbnail=thumbnail_url,
+                thumbnail=thumbnail,
             )
         )
 

@@ -120,6 +120,29 @@ def test_directories_span_midnight() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        # Reversed window
+        (
+            dt.datetime(2026, 11, 8, 12, 0, tzinfo=BERLIN),
+            dt.datetime(2026, 11, 8, 11, 0, tzinfo=BERLIN),
+        ),
+        # Millions of days would block the event loop
+        (
+            dt.datetime(1, 1, 2, tzinfo=dt.UTC),
+            dt.datetime(9999, 12, 31, tzinfo=dt.UTC),
+        ),
+    ],
+)
+def test_directories_reject_invalid_window(
+    start: dt.datetime, end: dt.datetime
+) -> None:
+    """Test reversed and overlong windows are rejected."""
+    with pytest.raises(ValueError):
+        snapshot_directories("/media/{date}", "Garage", 0, start, end, BERLIN)
+
+
 def test_recording_window_naive_and_aware() -> None:
     """Test the tolerance and that naive recording times use the given zone."""
     tolerance = dt.timedelta(seconds=5)

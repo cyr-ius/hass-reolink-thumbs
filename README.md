@@ -6,7 +6,15 @@ With Reolink-thumbs, this allows you to display thumbnails in the media sources 
 
 <img width="200" height="400" alt="image" src="https://github.com/user-attachments/assets/16134546-c388-47d4-adc7-46b26ae02a5b" />
 
-Images are generated on the fly during a day's viewing. They are stored in the `/config/www/recordings` directory.
+Images are generated on the fly while you browse a day: the list of recordings
+opens immediately and each thumbnail appears as soon as it is ready. At most
+three recordings per Reolink device are read at the same time.
+
+Thumbnails are stored in `/config/.cache/reolink_thumbs` (not included in
+backups) and served only to logged-in users. Thumbnails created by earlier
+versions in `/config/www/recordings` are moved there when they are displayed;
+that folder was readable without authentication and can be deleted once you no
+longer need it.
 
 ![GitHub release](https://img.shields.io/github/release/Cyr-ius/hass-reolink-thumbs)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
@@ -50,7 +58,7 @@ snapshot whose timestamp lies within the recording (start − tolerance to
 end + tolerance). If several snapshots match, the earliest one is used. It is
 scaled to 256 px and stored as PNG like any other thumbnail. Without a match the
 first video frame is used as before. Existing thumbnails are not replaced:
-delete them from `/config/www/recordings` to regenerate.
+delete them from `/config/.cache/reolink_thumbs` to regenerate.
 
 Recording times come from the camera (including its time zone and daylight
 saving time). Local timestamps in file names are interpreted in the Home

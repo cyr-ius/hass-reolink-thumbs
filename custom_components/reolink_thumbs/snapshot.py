@@ -18,6 +18,10 @@ _LOGGER = logging.getLogger(__name__)
 # Placeholders allowed in the snapshot directory template
 DIRECTORY_FIELDS = ("camera", "camera_slug", "channel", "date")
 
+# Longest time window searched for snapshots. Recordings last minutes; the
+# limit keeps a bogus window from blocking the event loop.
+MAX_WINDOW = dt.timedelta(days=1)
+
 # strftime-like directives allowed in the snapshot file name pattern
 _DIRECTIVES = {
     "Y": r"\d{4}",
@@ -144,7 +148,10 @@ def snapshot_directories(
 
     With a {date} placeholder every local day touched by the window is
     searched, so recordings spanning midnight are handled.
+    Raises ValueError if the window is reversed or longer than MAX_WINDOW.
     """
+    if not dt.timedelta(0) <= end - start <= MAX_WINDOW:
+        raise ValueError(f"Invalid snapshot time window {start} - {end}")
     first = start.astimezone(tz).date()
     last = end.astimezone(tz).date()
     directories: list[Path] = []

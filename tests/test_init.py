@@ -9,12 +9,14 @@ import pytest
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.reolink_thumbs import _async_thumbnail_source
 from custom_components.reolink_thumbs.const import (
     CONF_SNAPSHOT_DIRECTORY,
     CONF_SNAPSHOT_PATTERN,
     CONF_SNAPSHOT_TOLERANCE,
     DOMAIN,
+)
+from custom_components.reolink_thumbs.thumbnail import (
+    async_thumbnail_source as _async_thumbnail_source,
 )
 
 VOD_URL = "rtmp://camera/vod"

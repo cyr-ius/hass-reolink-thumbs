@@ -179,13 +179,13 @@ def find_snapshot(
                         continue
                     try:
                         timestamp = parse_timestamp(match, tz)
-                    except (ValueError, OverflowError):
+                    except ValueError, OverflowError:
                         continue
                     if start <= timestamp <= end and (
                         best is None or (timestamp, entry.name) < best[:2]
                     ):
                         best = (timestamp, entry.name, Path(entry.path))
-        except (FileNotFoundError, NotADirectoryError):
+        except FileNotFoundError, NotADirectoryError:
             continue
         except OSError as err:
             _LOGGER.warning("Cannot read snapshot directory %s: %s", directory, err)

@@ -226,16 +226,12 @@ async def test_service_other_errors(
         "custom_components.reolink_thumbs.get_host",
         side_effect=[host, RuntimeError("broken")],
     ):
-        await hass.services.async_call(
-            DOMAIN, "generate_thumbnails", {}, blocking=True
-        )
+        await hass.services.async_call(DOMAIN, "generate_thumbnails", {}, blocking=True)
     with patch(
         "custom_components.reolink_thumbs._generate_missing_thumbnails",
         side_effect=RuntimeError("unexpected"),
     ):
-        await hass.services.async_call(
-            DOMAIN, "generate_thumbnails", {}, blocking=True
-        )
+        await hass.services.async_call(DOMAIN, "generate_thumbnails", {}, blocking=True)
     assert not (config_dir / THUMB).exists()
 
 

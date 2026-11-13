@@ -97,7 +97,10 @@ async def test_tolerance(
             CONF_SNAPSHOT_TOLERANCE: 5,
         },
     )
-    assert await _async_thumbnail_source(hass, host, 0, recording) == (str(tmp_path / "Snapshot_20261108_115958.jpg"), True)
+    assert await _async_thumbnail_source(hass, host, 0, recording) == (
+        str(tmp_path / "Snapshot_20261108_115958.jpg"),
+        True,
+    )
 
 
 async def test_no_match_or_invalid_options(

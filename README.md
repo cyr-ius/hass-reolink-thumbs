@@ -22,6 +22,79 @@ Add your equipment via the Integration menu
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=hass-reolink-thumbs)
 
+## External snapshots (optional)
+
+By default a thumbnail is the first frame of the recording, which often shows
+an empty scene because of the pre-recording. If another tool already saves
+pictures of detected objects (for example [VisionState](https://github.com/oleost/VisionState),
+Frigate or your own scripts), Reolink thumbs can use those pictures instead.
+Object detection and cropping stay entirely in that external tool; this
+integration only looks for image files.
+
+Open **Settings → Devices & services → Reolink thumbs → Configure**:
+
+- **Snapshot directory**: absolute path, empty = disabled (default). Placeholders:
+  - `{camera}`: camera name as shown by the Reolink integration
+  - `{camera_slug}`: the same name as a slug (`Front Door` → `front_door`)
+  - `{channel}`: channel number
+  - `{date}`: day of the snapshot, with an optional format such as `{date:%Y-%m-%d}`
+- **File name pattern** (default `Snapshot_%Y%m%d_%H%M%S*`): matched against
+  the whole file name. Supported: `%Y %y %m %d %H %M %S %f` (local time in the
+  Home Assistant time zone), `%s` (Unix timestamp), `%%`, and the wildcards `*`
+  and `?`. Example: `Snapshot_%Y%m%d_%H%M%S_person*` only uses pictures of persons.
+- **Tolerance** (seconds, default 0): also accept snapshots taken shortly before
+  the start or after the end of a recording.
+
+When a thumbnail is missing, the integration searches the directory for a
+snapshot whose timestamp lies within the recording (start − tolerance to
+end + tolerance). If several snapshots match, the earliest one is used. It is
+scaled to 256 px and stored as PNG like any other thumbnail. Without a match the
+first video frame is used as before. Existing thumbnails are not replaced:
+delete them from `/config/www/recordings` to regenerate.
+
+Recording times come from the camera (including its time zone and daylight
+saving time). Local timestamps in file names are interpreted in the Home
+Assistant time zone; during the repeated hour when daylight saving time ends,
+the first occurrence is assumed. Use `%s` to avoid this ambiguity.
+
+### Example: VisionState
+
+Save every new snapshot of a VisionState image entity into one folder per
+camera and day:
+
+```yaml
+alias: "Save VisionState snapshots"
+triggers:
+  - trigger: state
+    entity_id: image.front_door_person_snapshot
+    # Only new images, not the access token rotation (attribute change)
+    to: null
+    not_from: unavailable
+conditions:
+  - condition: template
+    value_template: "{{ trigger.to_state.state not in ['unknown', 'unavailable'] }}"
+actions:
+  - action: image.snapshot
+    target:
+      entity_id: "{{ trigger.entity_id }}"
+    data:
+      filename: >-
+        /media/snapshots/front_door/{{ now().strftime('%Y-%m-%d') }}/Snapshot_{{
+        now().strftime('%Y%m%d_%H%M%S') }}_person.jpg
+mode: queued
+```
+
+Options:
+
+- Snapshot directory: `/media/snapshots/{camera_slug}/{date:%Y-%m-%d}`
+- File name pattern: `Snapshot_%Y%m%d_%H%M%S_person*`
+
+If your folders are named differently from the cameras, create a symbolic link
+per camera, e.g. `ln -s /media/snapshots/backyard /media/snapshots/front_door`.
+
+Remember to delete old snapshots, for example with a `shell_command` that runs
+`find /media/snapshots -type f -mtime +14 -delete` once a day.
+
 ## Service
 
 ### `reolink_thumbs.generate_thumbnails`

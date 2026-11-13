@@ -20,8 +20,23 @@ from homeassistant.components.reolink.media_source import (
 from homeassistant.components.reolink.util import get_host
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.util import dt as dt_util
 from reolink_aio.enums import VodRequestType
-from reolink_aio.typings import VOD_trigger
+from reolink_aio.typings import VOD_file, VOD_trigger
+
+from .const import (
+    CONF_SNAPSHOT_DIRECTORY,
+    CONF_SNAPSHOT_PATTERN,
+    CONF_SNAPSHOT_TOLERANCE,
+    DEFAULT_SNAPSHOT_PATTERN,
+    DEFAULT_SNAPSHOT_TOLERANCE,
+)
+from .snapshot import (
+    compile_name_pattern,
+    find_snapshot,
+    recording_window,
+    snapshot_directories,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,17 +113,23 @@ def get_vod_type(host, filename) -> VodRequestType:
     return VodRequestType.PLAYBACK
 
 
-def generate_thumbnail(link, path):
-    """Generate thumb file."""
+def generate_thumbnail(link, path, image=False):
+    """Generate thumb file from a recording or, if image is True, a still image."""
     try:
         _LOGGER.info("Starting FFmpeg for thumbnail - URL: %s, Output: %s", link, path)
 
+        # Seeking a single image makes FFmpeg write no output at all
+        input_options = {} if image else {"ss": 0}
+
         # Run FFmpeg and capture output for better error messages
-        ffmpeg.input(link, ss=0).filter("scale", 256, -1).output(
+        ffmpeg.input(link, **input_options).filter("scale", 256, -1).output(
             str(path), vframes=1, loglevel="error"
         ).run(capture_stdout=True, capture_stderr=True)
 
-        _LOGGER.info("Thumbnail successfully created: %s", path)
+        if Path(path).exists():
+            _LOGGER.info("Thumbnail successfully created: %s", path)
+        else:
+            _LOGGER.warning("FFmpeg did not create thumbnail %s from %s", path, link)
 
     except ffmpeg.Error as e:
         _LOGGER.error(
@@ -126,6 +147,67 @@ def generate_thumbnail(link, path):
             exc_info=True,
         )
         # Don't raise - allow media browser to continue without thumbnail
+
+
+async def _async_find_external_snapshot(
+    hass: HomeAssistant, host, channel: int, file: VOD_file
+) -> Path | None:
+    """Return an external snapshot taken during the recording, if configured."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if not entries:
+        return None
+    options = entries[0].options
+    template = options.get(CONF_SNAPSHOT_DIRECTORY)
+    if not template:
+        return None
+
+    tz = dt_util.get_default_time_zone()
+    tolerance = dt.timedelta(
+        seconds=options.get(CONF_SNAPSHOT_TOLERANCE, DEFAULT_SNAPSHOT_TOLERANCE)
+    )
+    start, end = recording_window(file.start_time, file.end_time, tolerance, tz)
+    try:
+        pattern = compile_name_pattern(
+            options.get(CONF_SNAPSHOT_PATTERN, DEFAULT_SNAPSHOT_PATTERN)
+        )
+        directories = snapshot_directories(
+            template, host.api.camera_name(channel), channel, start, end, tz
+        )
+    except ValueError as err:
+        _LOGGER.warning("Invalid external snapshot settings: %s", err)
+        return None
+
+    snapshot = await asyncio.to_thread(
+        find_snapshot, directories, pattern, tz, start, end
+    )
+    if snapshot is None:
+        _LOGGER.debug(
+            "No external snapshot for %s in %s",
+            file.file_name,
+            ", ".join(str(directory) for directory in directories),
+        )
+    else:
+        _LOGGER.debug("Using external snapshot %s for %s", snapshot, file.file_name)
+    return snapshot
+
+
+async def _async_thumbnail_source(
+    hass: HomeAssistant, host, channel: int, file: VOD_file
+) -> tuple[str, bool]:
+    """Return the FFmpeg input for a thumbnail and whether it is a still image.
+
+    The input is an external snapshot if one matches, otherwise the recording.
+    """
+    snapshot = await _async_find_external_snapshot(hass, host, channel, file)
+    if snapshot is not None:
+        return str(snapshot), True
+
+    vod_type = get_vod_type(host, file.file_name)
+    # Always use the low resolution (sub) stream to save bandwidth and CPU
+    _, reolink_url = await host.api.get_vod_source(
+        channel, file.file_name, "sub", vod_type
+    )
+    return reolink_url, False
 
 
 async def _generate_missing_thumbnails(
@@ -229,16 +311,15 @@ async def _generate_missing_thumbnails(
                             # Only generate if missing
                             if not Path.exists(thumb_path):
                                 try:
-                                    vod_type = get_vod_type(host, file.file_name)
-                                    _, reolink_url = await host.api.get_vod_source(
-                                        channel, file.file_name, stream, vod_type
+                                    source, image = await _async_thumbnail_source(
+                                        hass, host, channel, file
                                     )
 
                                     _LOGGER.debug(
                                         "Generating thumbnail for %s", file.file_name
                                     )
                                     await asyncio.to_thread(
-                                        generate_thumbnail, reolink_url, thumb_path
+                                        generate_thumbnail, source, thumb_path, image
                                     )
 
                                 except Exception as e:
@@ -357,16 +438,14 @@ async def _async_generate_camera_files(
         if not Path.exists(thumb_path):
             try:
                 _LOGGER.info("Preparing thumbnail for %s", file.file_name)
-                vod_type = get_vod_type(host, file.file_name)
-                # Always use the low resolution (sub) stream to save bandwidth and CPU
-                _, reolink_url = await host.api.get_vod_source(
-                    channel, file.file_name, "sub", vod_type
+                source, image = await _async_thumbnail_source(
+                    self.hass, host, channel, file
                 )
-                _LOGGER.info("Got VOD URL for %s: %s", file.file_name, reolink_url)
+                _LOGGER.info("Got thumbnail source for %s: %s", file.file_name, source)
 
                 # Generate thumbnail synchronously so we can see it immediately
                 # This blocks the media browser slightly but ensures thumbnails exist
-                await asyncio.to_thread(generate_thumbnail, reolink_url, thumb_path)
+                await asyncio.to_thread(generate_thumbnail, source, thumb_path, image)
 
             except Exception as e:
                 _LOGGER.error(

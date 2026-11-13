@@ -16,6 +16,9 @@ dev = [
   {include-group = "lint"},
   "pytest-homeassistant-custom-component",
   "pytest-asyncio",
+  "reolink-aio>=0.23.0",
+  "ffmpeg-python>=0.2.0",
+  "pyturbojpeg>=2.6.1",
 ]
 
 [tool.pytest.ini_options]

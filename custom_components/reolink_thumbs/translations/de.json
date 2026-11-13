@@ -1,0 +1,24 @@
+{
+  "options": {
+    "step": {
+      "init": {
+        "title": "Externe Snapshots",
+        "description": "Bilder eines externen Detektors als Vorschaubilder verwenden. Wurde während einer Aufnahme ein Snapshot gespeichert, ersetzt er das erste Videobild. Verzeichnis leer lassen zum Deaktivieren.\n\nPlatzhalter im Verzeichnis: {fields}. Beispiel: `{directory_example}`\nBeispiel für das Dateinamensmuster: `{pattern_example}`",
+        "data": {
+          "snapshot_directory": "Snapshot-Verzeichnis",
+          "snapshot_pattern": "Dateinamensmuster",
+          "snapshot_tolerance": "Toleranz"
+        },
+        "data_description": {
+          "snapshot_directory": "Absoluter Pfad. Der Datums-Platzhalter akzeptiert ein Datumsformat, wie im Beispiel oben.",
+          "snapshot_pattern": "Wird mit dem ganzen Dateinamen verglichen. Unterstützt %Y %y %m %d %H %M %S %f (Zeitzone von Home Assistant), %s (Unix-Zeitstempel) und die Platzhalter * und ?.",
+          "snapshot_tolerance": "Auch Snapshots bis zu so vielen Sekunden vor Beginn oder nach Ende einer Aufnahme akzeptieren."
+        }
+      }
+    },
+    "error": {
+      "invalid_directory": "Ungültiges Verzeichnis: absoluten Pfad und nur die genannten Platzhalter verwenden.",
+      "invalid_pattern": "Ungültiges Muster: Es muss %s oder ein vollständiges Datum mit Uhrzeit enthalten (%Y oder %y, %m, %d, %H, %M)."
+    }
+  }
+}

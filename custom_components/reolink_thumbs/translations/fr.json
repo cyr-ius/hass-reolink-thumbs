@@ -1,0 +1,24 @@
+{
+  "options": {
+    "step": {
+      "init": {
+        "title": "Instantanés externes",
+        "description": "Utiliser les images d'un détecteur externe comme miniatures. Si un instantané a été pris pendant un enregistrement, il remplace la première image de la vidéo. Laisser le répertoire vide pour désactiver.\n\nVariables du répertoire : {fields}. Exemple : `{directory_example}`\nExemple de modèle de nom de fichier : `{pattern_example}`",
+        "data": {
+          "snapshot_directory": "Répertoire des instantanés",
+          "snapshot_pattern": "Modèle de nom de fichier",
+          "snapshot_tolerance": "Tolérance"
+        },
+        "data_description": {
+          "snapshot_directory": "Chemin absolu. La variable de date accepte un format de date, comme dans l'exemple ci-dessus.",
+          "snapshot_pattern": "Comparé au nom de fichier complet. Prend en charge %Y %y %m %d %H %M %S %f (fuseau horaire de Home Assistant), %s (horodatage Unix) et les jokers * et ?.",
+          "snapshot_tolerance": "Accepter aussi les instantanés pris jusqu'à ce nombre de secondes avant le début ou après la fin d'un enregistrement."
+        }
+      }
+    },
+    "error": {
+      "invalid_directory": "Répertoire invalide : utilisez un chemin absolu et uniquement les variables indiquées.",
+      "invalid_pattern": "Modèle invalide : il doit contenir %s ou une date et une heure complètes (%Y ou %y, %m, %d, %H, %M)."
+    }
+  }
+}

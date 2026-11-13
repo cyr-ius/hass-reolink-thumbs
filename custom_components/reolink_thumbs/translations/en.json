@@ -1,0 +1,24 @@
+{
+  "options": {
+    "step": {
+      "init": {
+        "title": "External snapshots",
+        "description": "Use images from an external detector as thumbnails. If a snapshot was taken while a recording ran, it is used instead of the first video frame. Leave the directory empty to disable.\n\nDirectory placeholders: {fields}. Example: `{directory_example}`\nFile name pattern example: `{pattern_example}`",
+        "data": {
+          "snapshot_directory": "Snapshot directory",
+          "snapshot_pattern": "File name pattern",
+          "snapshot_tolerance": "Tolerance"
+        },
+        "data_description": {
+          "snapshot_directory": "Absolute path. The date placeholder accepts a date format, as in the example above.",
+          "snapshot_pattern": "Matched against the whole file name. Supports %Y %y %m %d %H %M %S %f (Home Assistant time zone), %s (Unix timestamp) and the wildcards * and ?.",
+          "snapshot_tolerance": "Also accept snapshots taken this many seconds before the start or after the end of a recording."
+        }
+      }
+    },
+    "error": {
+      "invalid_directory": "Invalid directory: use an absolute path and only the listed placeholders.",
+      "invalid_pattern": "Invalid pattern: it must contain %s or a complete date and time (%Y or %y, %m, %d, %H, %M)."
+    }
+  }
+}

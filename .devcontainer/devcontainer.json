@@ -6,9 +6,7 @@
   "image": "mcr.microsoft.com/devcontainers/python:3-3.14-trixie",
   "features": {
     "ghcr.io/devcontainers-extra/features/prek:1": {},
-    "ghcr.io/devcontainers-extra/features/uv:1": {},
-    "ghcr.io/devcontainers/features/node:2": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+    "ghcr.io/devcontainers-extra/features/uv:1": {}
   },
   "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder} && prek install --overwrite && uv sync --group dev --link-mode=copy",
   "customizations": {
@@ -53,8 +51,5 @@
         "files.trimTrailingWhitespace": true
       }
     }
-  },
-  "mounts": [
-    "source=${env:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached"
-  ]
+  }
 }

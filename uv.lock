@@ -2769,7 +2769,7 @@ wheels = [
 
 [[package]]
 name = "reolink-aio"
-version = "0.23.0"
+version = "0.23.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2778,9 +2778,9 @@ dependencies = [
     { name = "pycryptodomex" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/16/ab8e5f2c7c776d678b87d3227c79bd2f546021e6583ba6de0d2433f21ce5/reolink_aio-0.23.0.tar.gz", hash = "sha256:445de479f8b9f5307efba7a0a3217a9339950a88811321a812144015ef1936c2", size = 150457, upload-time = "2026-11-09T20:40:41.261Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/1a/57718f5053f5a504bab0e015c983d03ce53e6d87f23fdb4472abff2e5236/reolink_aio-0.23.1.tar.gz", hash = "sha256:f6fe9151cfee3be1fd18f361e96675376b59cdfadc7e4d38b242fd4ccfc42a8b", size = 153315, upload-time = "2026-11-14T17:17:23.795Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/e3/7ea45b91b03b7028341f63ff222b0b8954714ff2b384232f73e911d7c806/reolink_aio-0.23.0-py3-none-any.whl", hash = "sha256:db5b39a1630da31855e4364968fa42bc2f18a29201d45e083abe35e48ce7d690", size = 149503, upload-time = "2026-11-09T20:40:39.841Z" },
+    { url = "https://files.pythonhosted.org/packages/34/de/34efe48020e285b7fa8b5f46fb3572d4d7c055fc9aa20e240e58d7e52bda/reolink_aio-0.23.1-py3-none-any.whl", hash = "sha256:da46d1388a4bb6cb51a4631c2beeb97c5af4da21026ddc2f57e8a071bf2fbef3", size = 152177, upload-time = "2026-11-14T17:17:22.054Z" },
 ]
 
 [[package]]
